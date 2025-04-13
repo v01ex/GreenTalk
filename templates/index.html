@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <head>
+    <title>GreenTalk Web Messenger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+  </head>
+  <body>
+    <h1>GreenTalk</h1>
+    <div id="chat" style="border:1px solid #ccc; padding:10px; width:60%; height:300px; overflow:auto;"></div>
+    <br>
+    <input id="sender" type="text" placeholder="Ваше имя" value="User1">
+    <input id="message" type="text" placeholder="Ваше сообщение" style="width:50%;">
+    <button onclick="sendMessage()">Отправить</button>
+    
+    <script>
+      var socket = io();
+
+      socket.on('connect', function() {
+        console.log('Подключено к серверу!');
+        socket.emit('load_history');
+      });
+
+      socket.on('receive_message', function(data) {
+        var chat = document.getElementById('chat');
+        chat.innerHTML += '<p><strong>' + data.sender + ':</strong> ' + data.message + '</p>';
+        chat.scrollTop = chat.scrollHeight;
+      });
+
+      socket.on('load_history', function(messages) {
+        var chat = document.getElementById('chat');
+        chat.innerHTML = '';
+        messages.forEach(function(msg) {
+          chat.innerHTML += '<p><strong>' + msg.sender + ':</strong> ' + msg.message + '</p>';
+        });
+        chat.scrollTop = chat.scrollHeight;
+      });
+
+      function sendMessage() {
+        var sender = document.getElementById('sender').value;
+        var message = document.getElementById('message').value;
+        if(message.trim() !== "") {
+          socket.emit('send_message', {sender: sender, message: message});
+          document.getElementById('message').value = '';
+        }
+      }
+    </script>
+  </body>
+</html>

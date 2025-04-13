@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Чат - GreenTalk{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-md-12">
+    <h2>Добро пожаловать, {{ username }}!</h2>
+    <div id="chat" class="border rounded p-3 mb-3" style="height:400px; overflow-y:scroll; background-color: #ffffff;"></div>
+    <div class="input-group mb-3">
+      <input id="message" type="text" class="form-control" placeholder="Ваше сообщение">
+      <button class="btn btn-primary" type="button" onclick="sendMessage()">Отправить</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+<script>
+  var socket = io();
+  socket.on('connect', function() {
+    console.log('Подключено к серверу!');
+    socket.emit('load_history');
+  });
+  socket.on('receive_message', function(data) {
+    var chat = document.getElementById('chat');
+    chat.innerHTML += '<p><strong>' + data.sender + ':</strong> ' + data.message + '</p>';
+    chat.scrollTop = chat.scrollHeight;
+  });
+  socket.on('load_history', function(messages) {
+    var chat = document.getElementById('chat');
+    chat.innerHTML = '';
+    messages.forEach(function(msg) {
+      chat.innerHTML += '<p><strong>' + msg.sender + ':</strong> ' + msg.message + '</p>';
+    });
+    chat.scrollTop = chat.scrollHeight;
+  });
+  function sendMessage() {
+    var message = document.getElementById('message').value;
+    if(message.trim() !== "") {
+      socket.emit('send_message', { message: message });
+      document.getElementById('message').value = '';
+    }
+  }
+</script>
+{% endblock %}
