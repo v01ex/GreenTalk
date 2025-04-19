@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}Чаты - GreenTalk{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modern_chat.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1"></script>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <!-- Боковая панель -->
+    <div class="sidebar">
+        <!-- Хедер пользователя -->
+        <div class="user-header">
+            <div class="user-profile" id="userProfileMenu">
+                <div class="user-avatar">
+                    <img id="userAvatar" src="{{ url_for('static', filename='img/default-avatar.png') }}" alt="User">
+                    <div class="status-indicator online"></div>
+                </div>
+                <div class="user-info">
+                    <h4 id="userName">{{ session['username'] }}</h4>
+                    <p class="status">Онлайн</p>
+                </div>
+            </div>
+            <div class="user-menu">
+                <button id="toggleThemeBtn" class="theme-toggle-btn">
+                    <i class="fas fa-moon theme-icon-dark"></i>
+                    <i class="fas fa-sun theme-icon-light"></i>
+                </button>
+                <button id="settingsBtn" class="settings-btn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Поиск -->
+        <div class="search-container">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Поиск...">
+                <button id="clearSearchBtn" class="clear-search">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <button id="newChatBtn" class="new-chat-btn" title="Новый чат">
+                <i class="fas fa-pen"></i>
+            </button>
+        </div>
+
+        <!-- Фильтры чатов -->
+        <div class="chat-filters">
+            <button class="filter-btn active" data-filter="all">Все</button>
+            <button class="filter-btn" data-filter="private">Личные</button>
+            <button class="filter-btn" data-filter="groups">Группы</button>
+            <button class="filter-btn" data-filter="favorites">Избранное</button>
+        </div>
+
+        <!-- Список чатов -->
+        <div class="chat-list-container">
+            <div id="chatsList" class="chats-list">
+                <!-- Чаты будут добавлены динамически -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной контейнер сообщений -->
+    <div class="chat-content">
+        <!-- Хедер активного чата -->
+        <div class="chat-header">
+            <div id="chatInfo" class="chat-info">
+                <div class="no-chat-selected">
+                    <h3>Выберите чат или начните новый разговор</h3>
+                </div>
+                <div class="active-chat-info" style="display: none;">
+                    <div class="chat-avatar">
+                        <img id="chatAvatarImg" src="{{ url_for('static', filename='img/default-avatar.png') }}" alt="Chat">
+                        <div id="chatStatusIndicator" class="status-indicator offline"></div>
+                    </div>
+                    <div class="chat-details">
+                        <h3 id="chatName">Имя чата</h3>
+                        <p id="chatStatus" class="text-status">оффлайн</p>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-actions">
+                <button id="callBtn" class="action-btn" style="display: none;">
+                    <i class="fas fa-phone-alt"></i>
+                </button>
+                <button id="videoCallBtn" class="action-btn" style="display: none;">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button id="chatMenuBtn" class="action-btn" style="display: none;">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Контейнер с сообщениями -->
+        <div id="messagesContainer" class="messages-container">
+            <div class="welcome-screen">
+                <div class="welcome-content">
+                    <img src="{{ url_for('static', filename='img/chat-welcome.svg') }}" alt="Welcome" class="welcome-img">
+                    <h2>Добро пожаловать в GreenTalk</h2>
+                    <p>Выберите чат слева или создайте новый</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Форма отправки сообщения -->
+        <div id="messageFormContainer" class="message-form-container" style="display: none;">
+            <div class="message-attachments">
+                <button class="attachment-btn" id="emojiBtn">
+                    <i class="far fa-smile"></i>
+                </button>
+                <button class="attachment-btn" id="fileBtn">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <button class="attachment-btn" id="imageBtn">
+                    <i class="far fa-image"></i>
+                </button>
+                <button class="attachment-btn" id="audioBtn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>
+            <div class="message-input-wrapper">
+                <textarea id="messageInput" placeholder="Введите сообщение..." rows="1"></textarea>
+                <div id="recordingIndicator" class="recording-indicator" style="display: none;">
+                    <span class="recording-time">00:00</span>
+                    <div class="recording-waves">
+                        <span></span><span></span><span></span><span></span>
+                    </div>
+                    <button id="cancelRecordingBtn" class="cancel-recording-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <button id="sendMessageBtn" class="send-btn">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Контекстное меню сообщения -->
+<div id="messageContextMenu" class="context-menu">
+    <ul>
+        <li data-action="reply"><i class="fas fa-reply"></i> Ответить</li>
+        <li data-action="forward"><i class="fas fa-share"></i> Переслать</li>
+        <li data-action="edit"><i class="fas fa-edit"></i> Редактировать</li>
+        <li data-action="copy"><i class="fas fa-copy"></i> Копировать</li>
+        <li data-action="delete"><i class="fas fa-trash"></i> Удалить</li>
+        <li data-action="reactions"><i class="far fa-smile"></i> Добавить реакцию</li>
+    </ul>
+</div>
+
+<!-- Контекстное меню чата -->
+<div id="chatContextMenu" class="context-menu">
+    <ul>
+        <li data-action="info"><i class="fas fa-info-circle"></i> Информация</li>
+        <li data-action="mute"><i class="fas fa-bell-slash"></i> Отключить уведомления</li>
+        <li data-action="search"><i class="fas fa-search"></i> Поиск по чату</li>
+        <li data-action="pin"><i class="fas fa-thumbtack"></i> Закрепить</li>
+        <li data-action="favorite"><i class="far fa-star"></i> В избранное</li>
+        <li data-action="block"><i class="fas fa-ban"></i> Заблокировать</li>
+        <li data-action="clear"><i class="fas fa-broom"></i> Очистить чат</li>
+        <li data-action="delete"><i class="fas fa-trash"></i> Удалить чат</li>
+    </ul>
+</div>
+
+<!-- Модальное окно выбора файлов -->
+<div id="attachmentModal" class="attachment-popup">
+    <div class="attachment-popup-content">
+        <div class="attachment-popup-header">
+            <h3>Прикрепить файл</h3>
+            <button class="attachment-popup-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="attachment-options">
+                <div class="attachment-option" data-type="image">
+                    <div class="attachment-option-icon"><i class="far fa-image"></i></div>
+                    <span>Фото</span>
+                </div>
+                <div class="attachment-option" data-type="video">
+                    <div class="attachment-option-icon"><i class="fas fa-video"></i></div>
+                    <span>Видео</span>
+                </div>
+                <div class="attachment-option" data-type="audio">
+                    <div class="attachment-option-icon"><i class="fas fa-music"></i></div>
+                    <span>Аудио</span>
+                </div>
+                <div class="attachment-option" data-type="document">
+                    <div class="attachment-option-icon"><i class="fas fa-file"></i></div>
+                    <span>Документ</span>
+                </div>
+                <div class="attachment-option" data-type="location">
+                    <div class="attachment-option-icon"><i class="fas fa-map-marker-alt"></i></div>
+                    <span>Локация</span>
+                </div>
+                <div class="attachment-option" data-type="contact">
+                    <div class="attachment-option-icon"><i class="fas fa-user"></i></div>
+                    <span>Контакт</span>
+                </div>
+            </div>
+            <div class="attachment-upload-area">
+                <input type="file" id="fileUploadInput" style="display: none;">
+                <div class="drop-area">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Перетащите файлы сюда или <span class="browse-link">выберите файл</span></p>
+                </div>
+                <div class="selected-files" style="display: none;">
+                    <h4>Выбранные файлы:</h4>
+                    <ul id="selectedFilesList"></ul>
+                </div>
+            </div>
+        </div>
+        <div class="attachment-actions">
+            <button class="btn-cancel">Отмена</button>
+            <button class="btn-send">Отправить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно создания группового чата -->
+<div id="newGroupModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Создать групповой чат</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="groupName">Название группы</label>
+                <input type="text" id="groupName" placeholder="Введите название группы">
+            </div>
+            <div class="form-group">
+                <label for="groupDescription">Описание (необязательно)</label>
+                <textarea id="groupDescription" placeholder="Введите описание группы"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Участники</label>
+                <div class="search-participants">
+                    <input type="text" id="participantSearch" placeholder="Найти пользователей...">
+                </div>
+                <div class="selected-participants">
+                    <h4>Выбранные участники:</h4>
+                    <ul id="selectedParticipantsList"></ul>
+                </div>
+                <div class="available-participants">
+                    <h4>Доступные пользователи:</h4>
+                    <ul id="availableParticipantsList"></ul>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel">Отмена</button>
+            <button class="btn-create">Создать группу</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно настроек профиля -->
+<div id="profileSettingsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Настройки профиля</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="profile-avatar-section">
+                <div class="avatar-preview">
+                    <img id="profileAvatarPreview" src="{{ url_for('static', filename='img/default-avatar.png') }}" alt="Avatar Preview">
+                </div>
+                <button class="btn-change-avatar">Изменить аватар</button>
+            </div>
+            <div class="profile-form">
+                <div class="form-group">
+                    <label for="profileUsername">Имя пользователя</label>
+                    <input type="text" id="profileUsername" value="{{ session['username'] }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="profileName">Имя</label>
+                    <input type="text" id="profileName" placeholder="Ваше имя">
+                </div>
+                <div class="form-group">
+                    <label for="profileLastName">Фамилия</label>
+                    <input type="text" id="profileLastName" placeholder="Ваша фамилия">
+                </div>
+                <div class="form-group">
+                    <label for="profileBio">О себе</label>
+                    <textarea id="profileBio" placeholder="Расскажите о себе"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="profileEmail">Email</label>
+                    <input type="email" id="profileEmail" placeholder="Ваш email">
+                </div>
+                <div class="form-group">
+                    <label for="profileCity">Город</label>
+                    <input type="text" id="profileCity" placeholder="Ваш город">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel">Отмена</button>
+            <button class="btn-save">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно информации о чате -->
+<div id="chatInfoModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Информация о чате</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="chat-info-header">
+                <div class="chat-info-avatar">
+                    <img id="chatInfoAvatar" src="{{ url_for('static', filename='img/default-avatar.png') }}" alt="Chat Avatar">
+                </div>
+                <div class="chat-info-title">
+                    <h3 id="chatInfoName">Имя чата</h3>
+                    <p id="chatInfoStatus">Был в сети: сегодня</p>
+                </div>
+            </div>
+            <div class="chat-info-actions">
+                <button class="info-action-btn" data-action="mute">
+                    <i class="fas fa-bell-slash"></i>
+                    <span>Отключить уведомления</span>
+                </button>
+                <button class="info-action-btn" data-action="search">
+                    <i class="fas fa-search"></i>
+                    <span>Поиск по чату</span>
+                </button>
+                <button class="info-action-btn" data-action="block">
+                    <i class="fas fa-ban"></i>
+                    <span>Заблокировать</span>
+                </button>
+            </div>
+            <div class="chat-info-section">
+                <h4>Медиафайлы</h4>
+                <div class="chat-media-grid" id="chatMediaGrid">
+                    <!-- Медиа файлы будут добавлены динамически -->
+                </div>
+                <button class="btn-view-all">Показать все</button>
+            </div>
+            <div class="chat-info-section">
+                <h4>Участники <span id="participantsCount">(2)</span></h4>
+                <ul class="chat-members-list" id="chatMembersList">
+                    <!-- Участники будут добавлены динамически -->
+                </ul>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-danger">Удалить чат</button>
+            <button class="btn-primary">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/modern_chat.js') }}"></script>
+{% endblock %} 

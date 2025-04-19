@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Редактирование профиля{% endblock %}
+
+{% block head %}
+<style>
+  .edit-profile-container {
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .edit-profile-header {
+    background-color: var(--card-bg);
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .edit-profile-avatar-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .edit-profile-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 5px solid var(--card-bg);
+    object-fit: cover;
+    display: inline-block;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .avatar-upload {
+    position: relative;
+    margin-top: 20px;
+  }
+  
+  .avatar-upload .avatar-edit {
+    position: absolute;
+    right: 12px;
+    z-index: 1;
+    top: 10px;
+  }
+  
+  .avatar-upload .avatar-edit input {
+    display: none;
+  }
+  
+  .avatar-upload .avatar-edit label {
+    display: inline-block;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 0;
+    border-radius: 100%;
+    background: #0d6efd;
+    border: 1px solid transparent;
+    box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    font-weight: normal;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+  }
+  
+  .avatar-upload .avatar-edit label:hover {
+    background: #0b5ed7;
+    transform: translateY(-3px);
+  }
+  
+  .edit-profile-form {
+    padding: 30px;
+    background-color: var(--card-bg);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-label {
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-color);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .form-control {
+    background-color: var(--body-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .form-control:focus {
+    background-color: var(--body-bg);
+    color: var(--text-color);
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  
+  .btn-save {
+    padding: 10px 30px;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-save:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .avatar-preview {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Редактирование профиля</h4>
+                </div>
+                <div class="card-body">
+                    {% if profile %}
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3 text-center">
+                            <img src="{{ profile.avatar_url|default(url_for('static', filename='img/default-avatar.png')) }}" 
+                                alt="Аватар" class="rounded-circle img-fluid mb-3" 
+                                style="max-width: 150px;" id="avatar-preview">
+                            <div class="mb-3">
+                                <label for="avatar" class="form-label">Изменить аватар</label>
+                                <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*" onchange="previewAvatar(event)">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Имя</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ profile.name|default('') }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="last_name" class="form-label">Фамилия</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" value="{{ profile.last_name|default('') }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ profile.email|default('') }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="birthdate" class="form-label">Дата рождения</label>
+                            <input type="date" class="form-control" id="birthdate" name="birthdate" value="{{ profile.birthdate|default('') }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="city" class="form-label">Город</label>
+                            <input type="text" class="form-control" id="city" name="city" value="{{ profile.city|default('') }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">О себе</label>
+                            <textarea class="form-control" id="bio" name="bio" rows="4">{{ profile.bio|default('') }}</textarea>
+                        </div>
+
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                            <a href="{{ url_for('profile', username=profile.username) }}" class="btn btn-secondary">Отмена</a>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-danger">
+                        Не удалось загрузить данные профиля. <a href="{{ url_for('private_chats') }}">Вернуться к чатам</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function previewAvatar(event) {
+    const input = event.target;
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        document.getElementById('avatar-preview').src = e.target.result;
+      };
+      
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+</script>
+{% endblock %} 

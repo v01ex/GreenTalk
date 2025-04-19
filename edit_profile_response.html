@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="ru" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Редактирование профиля</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+      :root {
+        --body-bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text-color: #212529;
+        --border-color: #dee2e6;
+        --nav-bg: #f8f9fa;
+        --nav-color: #212529;
+        --chat-bg: #ffffff;
+        --chat-list-hover: #f8f9fa;
+        --chat-list-active: #e9ecef;
+        --message-bubble-bg: #f1f1f1;
+        --message-bubble-own: #d1e7dd;
+        --transition-speed: 0.3s;
+      }
+
+      [data-bs-theme="dark"] {
+        --body-bg: #212529;
+        --card-bg: #343a40;
+        --text-color: #f8f9fa;
+        --border-color: #495057;
+        --nav-bg: #343a40;
+        --nav-color: #f8f9fa;
+        --chat-bg: #2b3035;
+        --chat-list-hover: #343a40;
+        --chat-list-active: #495057;
+        --message-bubble-bg: #343a40;
+        --message-bubble-own: #0d6efd20;
+      }
+
+      body {
+        background-color: var(--body-bg);
+        color: var(--text-color);
+        transition: background-color var(--transition-speed) ease, 
+                    color var(--transition-speed) ease;
+      }
+
+      .navbar {
+        background-color: var(--nav-bg) !important;
+        transition: background-color var(--transition-speed) ease;
+      }
+
+      .navbar-light .navbar-brand,
+      .navbar-light .navbar-nav .nav-link {
+        color: var(--nav-color);
+        transition: color var(--transition-speed) ease;
+      }
+
+      .card, .list-group-item {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--border-color);
+        transition: background-color var(--transition-speed) ease, 
+                    color var(--transition-speed) ease, 
+                    border-color var(--transition-speed) ease;
+      }
+      
+      .border {
+        border-color: var(--border-color) !important;
+        transition: border-color var(--transition-speed) ease;
+      }
+      
+      .dropdown-menu {
+        background-color: var(--card-bg);
+        border-color: var(--border-color);
+        transition: background-color var(--transition-speed) ease, 
+                    border-color var(--transition-speed) ease;
+      }
+      
+      .dropdown-item {
+        color: var(--text-color);
+        transition: color var(--transition-speed) ease, 
+                    background-color var(--transition-speed) ease;
+      }
+      
+      .dropdown-item:hover {
+        background-color: var(--chat-list-hover);
+      }
+      
+      .chat-list-container {
+        background-color: var(--card-bg);
+        transition: background-color var(--transition-speed) ease;
+      }
+      
+      .chat-list .list-group-item {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--border-color);
+        transition: background-color var(--transition-speed) ease, 
+                    color var(--transition-speed) ease,
+                    border-color var(--transition-speed) ease;
+      }
+      
+      .chat-list .list-group-item:hover {
+        background-color: var(--chat-list-hover);
+      }
+      
+      .chat-list .list-group-item.active {
+        background-color: var(--chat-list-active);
+        color: var(--text-color);
+        border-color: var(--border-color);
+      }
+      
+      #chatContent, .border.rounded {
+        background-color: var(--chat-bg) !important;
+        transition: background-color var(--transition-speed) ease;
+      }
+      
+      /* Theme switch button */
+      #themeToggle {
+        cursor: pointer;
+        padding: 5px 10px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        font-size: 1.2rem;
+        transition: all 0.3s ease;
+      }
+      
+      [data-bs-theme="light"] .theme-icon-dark {
+        display: none;
+      }
+      
+      [data-bs-theme="dark"] .theme-icon-light {
+        display: none;
+      }
+
+      /* Page transition animations */
+      .page-transition-container {
+        position: relative;
+        min-height: 100vh;
+      }
+
+      .page-content {
+        animation: fadeIn 0.4s ease-in-out;
+      }
+
+      @keyframes fadeIn {
+        0% {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Theme toggle animation */
+      .theme-toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 30px;
+        margin: 0;
+      }
+
+      .theme-toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .theme-toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 30px;
+      }
+
+      .theme-toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+      }
+
+      input:checked + .theme-toggle-slider {
+        background-color: #2196F3;
+      }
+
+      input:checked + .theme-toggle-slider:before {
+        transform: translateX(30px);
+      }
+
+      .theme-icon-light, .theme-icon-dark {
+        position: absolute;
+        top: 6px;
+        font-size: 0.85rem;
+        transition: opacity 0.3s ease;
+      }
+
+      .theme-icon-light {
+        left: 8px;
+        color: #f1c40f;
+      }
+
+      .theme-icon-dark {
+        right: 8px;
+        color: #f8f9fa;
+      }
+    </style>
+    
+<style>
+  .edit-profile-container {
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .edit-profile-header {
+    background-color: var(--card-bg);
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .edit-profile-avatar-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .edit-profile-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 5px solid var(--card-bg);
+    object-fit: cover;
+    display: inline-block;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .avatar-upload {
+    position: relative;
+    margin-top: 20px;
+  }
+  
+  .avatar-upload .avatar-edit {
+    position: absolute;
+    right: 12px;
+    z-index: 1;
+    top: 10px;
+  }
+  
+  .avatar-upload .avatar-edit input {
+    display: none;
+  }
+  
+  .avatar-upload .avatar-edit label {
+    display: inline-block;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 0;
+    border-radius: 100%;
+    background: #0d6efd;
+    border: 1px solid transparent;
+    box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    font-weight: normal;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+  }
+  
+  .avatar-upload .avatar-edit label:hover {
+    background: #0b5ed7;
+    transform: translateY(-3px);
+  }
+  
+  .edit-profile-form {
+    padding: 30px;
+    background-color: var(--card-bg);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-label {
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-color);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .form-control {
+    background-color: var(--body-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .form-control:focus {
+    background-color: var(--body-bg);
+    color: var(--text-color);
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  
+  .btn-save {
+    padding: 10px 30px;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-save:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .avatar-preview {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+  }
+</style>
+
+  </head>
+  <body>
+    <div class="page-transition-container">
+      <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+          <a class="navbar-brand" href="/">GreenTalk</a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                  aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+              <li class="nav-item me-3 d-flex align-items-center">
+                <label class="theme-toggle-switch my-0">
+                  <input type="checkbox" id="themeToggleInput">
+                  <span class="theme-toggle-slider">
+                    <i class="bi bi-sun-fill theme-icon-light"></i>
+                    <i class="bi bi-moon-fill theme-icon-dark"></i>
+                  </span>
+                </label>
+              </li>
+              
+              <li class="nav-item">
+                <a class="nav-link" href="/private_chats">Чаты</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/search">Поиск пользователей</a>
+              </li>
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" 
+                   data-bs-toggle="dropdown" aria-expanded="false">
+                  Аналитика
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                  <li><a class="dropdown-item" href="/compression_stats">Статистика сжатия</a></li>
+                  <li><a class="dropdown-item" href="/compression_charts">Графики сжатия</a></li>
+                </ul>
+              </li>
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" 
+                   data-bs-toggle="dropdown" aria-expanded="false">
+                  <i class="bi bi-person-circle me-1"></i>test_user
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="userDropdown">
+                  <li><a class="dropdown-item" href="/profile/test_user">
+                    <i class="bi bi-person-badge me-2"></i>Мой профиль
+                  </a></li>
+                  <li><a class="dropdown-item" href="/edit_profile">
+                    <i class="bi bi-pencil-square me-2"></i>Редактировать профиль
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="/logout">
+                    <i class="bi bi-box-arrow-right me-2"></i>Выход
+                  </a></li>
+                </ul>
+              </li>
+              
+            </ul>
+          </div>
+        </div>
+      </nav>
+      <div class="container mt-4">
+        
+          
+        
+        <div class="page-content">
+          
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Редактирование профиля</h4>
+                </div>
+                <div class="card-body">
+                    
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3 text-center">
+                            <img src="/static/img/default-avatar.png" 
+                                alt="Аватар" class="rounded-circle img-fluid mb-3" 
+                                style="max-width: 150px;" id="avatar-preview">
+                            <div class="mb-3">
+                                <label for="avatar" class="form-label">Изменить аватар</label>
+                                <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*" onchange="previewAvatar(event)">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Имя</label>
+                            <input type="text" class="form-control" id="name" name="name" value="Test User">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="last_name" class="form-label">Фамилия</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" value="">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" value="test@example.com">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="birthdate" class="form-label">Дата рождения</label>
+                            <input type="date" class="form-control" id="birthdate" name="birthdate" value="">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="city" class="form-label">Город</label>
+                            <input type="text" class="form-control" id="city" name="city" value="">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">О себе</label>
+                            <textarea class="form-control" id="bio" name="bio" rows="4"></textarea>
+                        </div>
+
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                            <a href="/profile/test_user" class="btn btn-secondary">Отмена</a>
+                        </div>
+                    </form>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Theme toggle functionality
+      document.addEventListener('DOMContentLoaded', function() {
+        const htmlElement = document.documentElement;
+        const themeToggleInput = document.getElementById('themeToggleInput');
+        
+        // Check for saved theme preference or use preferred color scheme
+        const savedTheme = getCookie('theme');
+        if (savedTheme) {
+          htmlElement.setAttribute('data-bs-theme', savedTheme);
+          themeToggleInput.checked = savedTheme === 'dark';
+        } else {
+          // Check for OS preference
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (prefersDark) {
+            htmlElement.setAttribute('data-bs-theme', 'dark');
+            themeToggleInput.checked = true;
+            setCookie('theme', 'dark', 365);
+          }
+        }
+        
+        // Toggle theme when button is clicked
+        themeToggleInput.addEventListener('change', function() {
+          const newTheme = this.checked ? 'dark' : 'light';
+          
+          // Animate theme change
+          document.body.style.transition = 'background-color 0.5s ease, color 0.5s ease';
+          htmlElement.setAttribute('data-bs-theme', newTheme);
+          setCookie('theme', newTheme, 365);
+        });
+        
+        // Cookie functions
+        function setCookie(name, value, days) {
+          const date = new Date();
+          date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+          const expires = "expires=" + date.toUTCString();
+          document.cookie = name + "=" + value + ";" + expires + ";path=/";
+        }
+        
+        function getCookie(name) {
+          const nameEQ = name + "=";
+          const ca = document.cookie.split(';');
+          for(let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+          }
+          return null;
+        }
+
+        // Page transition for all links
+        setupPageTransitions();
+      });
+
+      // Setup smooth transitions between pages
+      function setupPageTransitions() {
+        const contentContainer = document.querySelector('.container.mt-4');
+        
+        // Add page-content class for initial animation
+        contentContainer.classList.add('page-content');
+        
+        // Add transition effect to internal links
+        document.querySelectorAll('a').forEach(link => {
+          // Skip links that open in new windows or are anchors
+          if (link.target === '_blank' || link.getAttribute('href')?.startsWith('#') || 
+              link.getAttribute('href')?.startsWith('javascript:') || 
+              link.getAttribute('href')?.startsWith('mailto:')) {
+            return;
+          }
+          
+          // Only apply to internal links
+          if (link.host === window.location.host) {
+            link.addEventListener('click', function(e) {
+              // Skip if modified click (ctrl, shift, etc)
+              if (e.ctrlKey || e.shiftKey || e.metaKey || e.button !== 0) {
+                return;
+              }
+              
+              e.preventDefault();
+              const targetUrl = link.href;
+              
+              // Animate out
+              contentContainer.style.opacity = '0';
+              contentContainer.style.transform = 'translateY(10px)';
+              contentContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+              
+              // Navigate after animation completes
+              setTimeout(() => {
+                window.location.href = targetUrl;
+              }, 300);
+            });
+          }
+        });
+      }
+    </script>
+    
+<script>
+  function previewAvatar(event) {
+    const input = event.target;
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        document.getElementById('avatar-preview').src = e.target.result;
+      };
+      
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+</script>
+
+  </body>
+</html>

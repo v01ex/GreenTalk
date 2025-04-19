@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Поиск пользователей - GreenTalk{% endblock %}
+
+{% block head %}
+<style>
+  .search-container {
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .search-form {
+    position: relative;
+    margin-bottom: 30px;
+  }
+  
+  .search-input {
+    height: 50px;
+    padding-left: 45px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    background-color: var(--body-bg);
+    color: var(--text-color);
+  }
+  
+  .search-input:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  
+  .search-icon {
+    position: absolute;
+    top: 50%;
+    left: 15px;
+    transform: translateY(-50%);
+    color: #6c757d;
+    z-index: 10;
+  }
+  
+  .search-button {
+    height: 50px;
+  }
+  
+  .results-container {
+    margin-top: 20px;
+  }
+  
+  .search-result-card {
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    background-color: var(--card-bg);
+    overflow: hidden;
+    animation: fadeInUp 0.4s ease;
+  }
+  
+  .search-result-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .user-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border-color);
+    transition: all 0.3s ease;
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .no-results {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-color);
+    animation: fadeIn 0.5s ease;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-container p-4 shadow-sm">
+  <h2 class="mb-4 text-center">Поиск пользователей</h2>
+  <form method="POST" class="search-form">
+    <div class="input-group">
+      <span class="search-icon">
+        <i class="bi bi-search"></i>
+      </span>
+      <input type="text" name="query" class="form-control search-input" placeholder="Введите логин пользователя" 
+             value="{{ request.form.get('query', '') }}">
+      <button type="submit" class="btn btn-primary search-button">Поиск</button>
+    </div>
+  </form>
+  
+  {% if request.method == 'POST' and not results %}
+    <div class="no-results">
+      <i class="bi bi-emoji-frown" style="font-size: 3rem;"></i>
+      <h5 class="mt-3">Пользователей не найдено</h5>
+      <p class="text-muted">Попробуйте изменить параметры поиска</p>
+    </div>
+  {% endif %}
+  
+  {% if results %}
+    <div class="results-container">
+      {% for user in results %}
+        <div class="card mb-3 search-result-card">
+          <div class="card-body d-flex align-items-center">
+            <a href="{{ url_for('profile', username=user.username) }}" class="text-decoration-none">
+              <div class="d-flex align-items-center">
+                <div class="me-3">
+                  <img src="{{ user.avatar_url|default(url_for('static', filename='img/default-avatar.png')) }}" 
+                       alt="{{ user.username }}" class="user-avatar">
+                </div>
+                <div>
+                  <h5 class="card-title mb-0">{{ user.name or user.username }}</h5>
+                  <p class="card-text text-muted mb-0">@{{ user.username }}</p>
+                  {% if user.city %}
+                    <small class="text-muted"><i class="bi bi-geo-alt-fill"></i> {{ user.city }}</small>
+                  {% endif %}
+                </div>
+              </div>
+            </a>
+            <div class="ms-auto">
+              <a href="{{ url_for('profile', username=user.username) }}" class="btn btn-sm btn-outline-info me-2">
+                <i class="bi bi-person-badge"></i> Профиль
+              </a>
+              <button onclick="openChatWithUser('{{ user.username }}')" class="btn btn-sm btn-primary">
+                <i class="bi bi-chat-dots-fill"></i> Написать
+              </button>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Функция для открытия чата с выбранным пользователем
+  function openChatWithUser(username) {
+    // Сохраняем выбранного пользователя в localStorage
+    localStorage.setItem('selectedChatUser', username);
+    
+    // Перенаправляем на страницу приватных чатов
+    window.location.href = "{{ url_for('private_chats') }}";
+  }
+</script>
+{% endblock %}

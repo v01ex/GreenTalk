@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <circle fill="#E3F2FD" cx="100" cy="100" r="100"></circle>
+        <g transform="translate(35.000000, 35.000000)">
+            <rect fill="#FFFFFF" x="0" y="0" width="130" height="90" rx="10"></rect>
+            <rect fill="#4A76A8" opacity="0.1" x="15" y="15" width="100" height="10" rx="5"></rect>
+            <rect fill="#4A76A8" opacity="0.1" x="15" y="35" width="70" height="10" rx="5"></rect>
+            <rect fill="#4A76A8" opacity="0.1" x="15" y="55" width="50" height="10" rx="5"></rect>
+            <path d="M125,92 L105,92 L105,120 C105,120.552 105.448,121 106,121 C106.183,121 106.362,120.947 106.512,120.848 L125.848,108.848 C126.314,108.547 126.439,107.921 126.139,107.455 C126.06,107.335 125.954,107.233 125.833,107.158 L125,92 Z" fill="#FFFFFF"></path>
+            <path d="M5,92 L25,92 L25,120 C25,120.552 24.552,121 24,121 C23.817,121 23.638,120.947 23.488,120.848 L4.152,108.848 C3.686,108.547 3.561,107.921 3.861,107.455 C3.94,107.335 4.046,107.233 4.167,107.158 L5,92 Z" fill="#FFFFFF"></path>
+        </g>
+        <circle fill="#4A76A8" cx="100" cy="140" r="10"></circle>
+        <circle fill="#4A76A8" opacity="0.6" cx="70" cy="140" r="10"></circle>
+        <circle fill="#4A76A8" opacity="0.3" cx="130" cy="140" r="10"></circle>
+    </g>
+</svg> 
