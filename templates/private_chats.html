@@ -1,0 +1,746 @@
+{% extends "base.html" %}
+{% block title %}Приватные чаты - GreenTalk{% endblock %}
+{% block content %}
+<div class="row">
+  <!-- Левая колонка: список приватных чатов -->
+  <div class="col-md-4">
+    <h3>Ваши чаты</h3>
+    <ul id="chatList" class="list-group">
+      <!-- Список чатов будет загружаться динамически через API -->
+    </ul>
+  </div>
+  <!-- Правая колонка: активный чат -->
+  <div class="col-md-8">
+    <!-- Заголовок чата с кнопкой очистки -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h3 id="chatPartnerTitle">Выберите чат</h3>
+      <button id="clearChatBtn" class="btn btn-sm btn-outline-danger" onclick="clearChat()" style="display:none;">
+        <i class="bi bi-trash"></i> Очистить чат
+      </button>
+    </div>
+    
+    <div id="chatContent" class="border rounded p-3 mb-3" style="height:400px; overflow-y:scroll; background-color:#fff;">
+      <p class="text-muted">Нажмите на чат из левого списка, чтобы открыть переписку.</p>
+    </div>
+    <!-- Поле ввода для текстовых сообщений -->
+    <div class="input-group mb-2">
+      <input id="messageInput" type="text" class="form-control" placeholder="Ваше сообщение">
+      <button class="btn btn-primary" type="button" onclick="sendMessage()">Отправить</button>
+    </div>
+    <!-- Кнопки для загрузки файлов -->
+    <div class="mb-2">
+      <label class="btn btn-outline-secondary">
+        Фото <input type="file" id="imageInput" accept="image/*" hidden onchange="uploadFile(this, 'image')">
+      </label>
+      <label class="btn btn-outline-secondary">
+        Видео <input type="file" id="videoInput" accept="video/*" hidden onchange="uploadFile(this, 'video')">
+      </label>
+      <label class="btn btn-outline-secondary">
+        Голос <input type="file" id="voiceInput" accept="audio/*" hidden onchange="uploadFile(this, 'voice')">
+      </label>
+    </div>
+    <!-- Информация о сжатии файла -->
+    <div id="compressionInfoContainer" class="alert alert-info mb-2" style="display:none;">
+      <span id="compressionInfo"></span>
+    </div>
+    <!-- Прогресс загрузки -->
+    <div class="progress mb-2" style="display:none;" id="uploadProgressContainer">
+      <div id="uploadProgress" class="progress-bar" role="progressbar" style="width:0%;">0%</div>
+    </div>
+    <!-- Голосовая запись -->
+    <div>
+      <button id="recordBtn" class="btn btn-outline-primary" onclick="toggleRecording()">Начать запись</button>
+      <button id="sendVoiceBtn" class="btn btn-outline-success" onclick="sendVoiceMessage()" style="display:none;">Отправить голос</button>
+      <p id="recordStatus" class="mt-2"></p>
+    </div>
+    <!-- Отладочная кнопка (временно) -->
+    <button id="debugButton" class="btn btn-sm btn-warning mt-2" onclick="checkChatConnection()" style="display:none;">Отладка чата</button>
+  </div>
+</div>
+
+<!-- Модальное окно для подтверждения очистки чата -->
+<div class="modal fade" id="clearChatModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Подтверждение</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Вы действительно хотите очистить весь чат?</p>
+        <p>Это действие нельзя отменить, все сообщения будут удалены.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-danger" onclick="confirmClearChat()">Удалить все сообщения</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Стили для медиа-контейнеров -->
+<style>
+  .media-container {
+    margin: 10px 0;
+    padding: 5px;
+    border-radius: 5px;
+    background-color: #f8f9fa;
+  }
+  .media-content {
+    max-width: 100%;
+    display: block;
+    margin-bottom: 5px;
+  }
+  .media-link {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: #6c757d;
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+<script>
+  // Инициализация SocketIO и глобальных переменных
+  let socket = io();
+  let currentUser = "{{ username }}";
+  let currentChatRoom = null;
+  let currentChatPartner = null;
+  let mediaRecorder = null;
+  let audioChunks = [];
+
+  // Отладка событий Socket.IO
+  socket.on('connect', function() {
+    console.log("Socket.IO connected!");
+  });
+
+  socket.on('disconnect', function() {
+    console.log("Socket.IO disconnected!");
+  });
+
+  socket.on('error', function(error) {
+    console.error("Socket.IO error:", error);
+  });
+
+  // Обработчик события очистки чата
+  socket.on('chat_cleared', function(data) {
+    console.log("Чат очищен:", data);
+    
+    // Очищаем содержимое чата
+    let chatContent = document.getElementById("chatContent");
+    if (chatContent) {
+      chatContent.innerHTML = `<p class="text-center text-muted">
+        <em>Чат был очищен пользователем ${data.cleared_by} 
+        ${new Date(data.timestamp * 1000).toLocaleTimeString()}</em>
+      </p>`;
+    }
+    
+    // Обновляем список чатов
+    loadChatList();
+  });
+
+  // Загрузка списка чатов через API
+  function loadChatList() {
+    fetch("/api/private_chats")
+      .then(response => response.json())
+      .then(data => {
+        let chatList = document.getElementById("chatList");
+        chatList.innerHTML = "";
+        data.chats.forEach(chat => {
+          let partner = chat.partner;
+          let label = (partner === currentUser) ? "Избранное" : partner;
+          let li = document.createElement("li");
+          li.className = "list-group-item";
+          li.style.cursor = "pointer";
+          li.innerText = label;
+          li.onclick = function() {
+            openChat(partner);
+          };
+          chatList.appendChild(li);
+        });
+      })
+      .catch(error => {
+        console.error("Ошибка при загрузке списка чатов:", error);
+      });
+  }
+
+  // Открытие чата с выбранным собеседником
+  function openChat(partner) {
+    currentChatPartner = partner;
+    currentChatRoom = [currentUser, partner].sort().join("_");
+    document.getElementById("chatPartnerTitle").innerText = "Чат с " + (partner === currentUser ? "Избранное" : partner);
+    document.getElementById("chatContent").innerHTML = "<p class='text-center'><i>Загрузка сообщений...</i></p>";
+    console.log(`Открываем чат с ${partner}, комната: ${currentChatRoom}`);
+    socket.emit("join_private", { room: currentChatRoom });
+    socket.emit("load_private_history", { room: currentChatRoom });
+    
+    // Показываем кнопку очистки чата
+    document.getElementById("clearChatBtn").style.display = "inline-block";
+    
+    // Показываем отладочную кнопку в режиме отладки
+    // document.getElementById("debugButton").style.display = "inline-block";
+  }
+
+  // Функция для очистки чата
+  function clearChat() {
+    if (!currentChatPartner) return;
+    
+    // Показываем модальное окно подтверждения
+    let clearChatModal = new bootstrap.Modal(document.getElementById('clearChatModal'));
+    clearChatModal.show();
+  }
+
+  // Подтверждение очистки чата
+  function confirmClearChat() {
+    if (!currentChatPartner) return;
+    
+    console.log(`Удаление всех сообщений с партнером ${currentChatPartner}`);
+    
+    // Отправляем запрос на сервер для удаления сообщений
+    fetch("/api/clear_chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        partner: currentChatPartner
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log("Результат очистки чата:", data);
+      
+      if (data.success) {
+        // Скрываем модальное окно
+        let modal = bootstrap.Modal.getInstance(document.getElementById('clearChatModal'));
+        modal.hide();
+        
+        // Уведомляем через Socket.IO
+        socket.emit("clear_chat", {
+          room: currentChatRoom,
+          partner: currentChatPartner
+        });
+        
+        // Очищаем чат
+        let chatContent = document.getElementById("chatContent");
+        chatContent.innerHTML = `<p class="text-center text-muted">
+          <em>Вы очистили чат. Удалено ${data.deleted_count} сообщений.</em>
+        </p>`;
+      } else {
+        alert("Ошибка при очистке чата: " + (data.error || "Неизвестная ошибка"));
+      }
+    })
+    .catch(error => {
+      console.error("Ошибка при очистке чата:", error);
+      alert("Ошибка при очистке чата");
+    });
+  }
+
+  // Обработка входящего сообщения
+  socket.on("receive_private_message", function(data) {
+    console.log("Получено сообщение:", data);
+    
+    if (!currentChatRoom) {
+      console.warn("Получено сообщение, но текущая комната не установлена");
+      return;
+    }
+    
+    let chatContent = document.getElementById("chatContent");
+    if (!chatContent) {
+      console.error("Элемент chatContent не найден!");
+      return;
+    }
+    
+    try {
+      let formattedMessage = formatMessage(data.message);
+      let messageHtml = `<p><strong>${data.sender}:</strong> ${formattedMessage}</p>`;
+      chatContent.innerHTML += messageHtml;
+      chatContent.scrollTop = chatContent.scrollHeight;
+      
+      // Обновляем список чатов после получения нового сообщения
+      loadChatList();
+    } catch (e) {
+      console.error("Ошибка при обработке входящего сообщения:", e);
+    }
+  });
+
+  // Загрузка истории выбранного чата
+  socket.on("load_private_history", function(messages) {
+    console.log("Получена история:", messages);
+    
+    let chatContent = document.getElementById("chatContent");
+    if (!chatContent) {
+      console.error("Элемент chatContent не найден!");
+      return;
+    }
+    
+    try {
+      chatContent.innerHTML = "";
+      
+      if (!messages || messages.length === 0) {
+        chatContent.innerHTML = "<p class='text-muted'>У вас пока нет сообщений. Начните общение прямо сейчас!</p>";
+        return;
+      }
+      
+      messages.forEach(function(msg) {
+        if (!msg.message) {
+          console.warn("Пустое сообщение в истории:", msg);
+          return;
+        }
+        
+        let formattedMessage = formatMessage(msg.message);
+        let messageHtml = `<p><strong>${msg.sender}:</strong> ${formattedMessage}</p>`;
+        chatContent.innerHTML += messageHtml;
+      });
+      
+      chatContent.scrollTop = chatContent.scrollHeight;
+    } catch (e) {
+      console.error("Ошибка при загрузке истории сообщений:", e);
+      chatContent.innerHTML = "<p class='text-danger'>Ошибка при загрузке истории сообщений. Попробуйте обновить страницу.</p>";
+    }
+  });
+
+  // Отправка текстового сообщения
+  function sendMessage() {
+    let message = document.getElementById("messageInput").value;
+    if (message.trim() !== "" && currentChatRoom) {
+      console.log(`Отправка сообщения в комнату ${currentChatRoom}: ${message}`);
+      socket.emit("send_private_message", { 
+        room: currentChatRoom, 
+        receiver: currentChatPartner, 
+        message: message 
+      });
+      document.getElementById("messageInput").value = "";
+    } else {
+      if (!currentChatRoom) {
+        console.warn("Не выбрана комната для отправки сообщения!");
+        alert("Пожалуйста, выберите чат перед отправкой сообщения.");
+      }
+    }
+  }
+
+  // Нажатие Enter в поле ввода отправляет сообщение
+  document.getElementById("messageInput").addEventListener("keyup", function(event) {
+    if (event.key === "Enter") {
+      sendMessage();
+    }
+  });
+
+  // Функция для проверки соединения с чатом
+  function checkChatConnection() {
+    console.log("Текущая комната:", currentChatRoom);
+    console.log("Текущий партнер:", currentChatPartner);
+    console.log("Socket.IO соединение:", socket.connected ? "Установлено" : "Отсутствует");
+    
+    if (currentChatRoom) {
+      console.log("Попытка переподключения к комнате:", currentChatRoom);
+      socket.emit("join_private", { room: currentChatRoom });
+      socket.emit("load_private_history", { room: currentChatRoom });
+      alert("Переподключение выполнено! Смотрите консоль для деталей.");
+    } else {
+      console.log("Комната не выбрана");
+      alert("Комната не выбрана! Сначала кликните на чат слева.");
+    }
+  }
+
+  // Форматирование сообщения: обработка файловых сообщений
+  function formatMessage(message) {
+    console.log("Форматирование сообщения:", message);
+    
+    if (!message) {
+      console.warn("Пустое сообщение в formatMessage");
+      return "[Пустое сообщение]";
+    }
+    
+    try {
+      if (message.startsWith("FILE:")) {
+        let parts = message.split(":", 3);
+        if (parts.length < 3) {
+          console.error("Неверный формат сообщения с файлом:", message);
+          return message;
+        }
+        
+        let fileType = parts[1];
+        let fileUrl = parts[2];
+        
+        // Проверка наличия URL-адреса
+        if (!fileUrl || fileUrl === "undefined") {
+          console.error("Пустой URL файла в сообщении:", message);
+          return "[Ошибка: пустой URL файла]";
+        }
+        
+        // Добавляем случайный параметр к URL для предотвращения кэширования
+        let cacheBuster = "?t=" + new Date().getTime() + Math.random();
+        let fullUrl = fileUrl + cacheBuster;
+        
+        // Создаем HTML в зависимости от типа файла
+        if (fileType === "image") {
+          return `
+            <div class="media-container">
+              <img src="${fullUrl}" class="media-content" alt="Изображение" 
+                   onerror="this.onerror=null; this.alt='Ошибка загрузки изображения'; console.error('Ошибка загрузки изображения', this.src);">
+              <a href="${fileUrl}" target="_blank" class="media-link">Открыть изображение в новой вкладке</a>
+            </div>`;
+        } else if (fileType === "video") {
+          return `
+            <div class="media-container">
+              <video controls class="media-content">
+                <source src="${fullUrl}" type="video/mp4" onerror="console.error('Ошибка загрузки видео', this.src);">
+                Ваш браузер не поддерживает видео.
+              </video>
+              <a href="${fileUrl}" target="_blank" class="media-link">Скачать видео</a>
+            </div>`;
+        } else if (fileType === "voice") {
+          return `
+            <div class="media-container">
+              <audio controls class="media-content">
+                <source src="${fullUrl}" type="audio/webm" onerror="console.error('Ошибка загрузки аудио', this.src);">
+                Ваш браузер не поддерживает аудио.
+              </audio>
+              <a href="${fileUrl}" target="_blank" class="media-link">Скачать аудио</a>
+            </div>`;
+        } else {
+          return `<a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">Скачать файл</a>`;
+        }
+      }
+    } catch (e) {
+      console.error("Ошибка в formatMessage:", e);
+      return message;
+    }
+    
+    // Обычное текстовое сообщение
+    return message;
+  }
+
+  // Загрузка файла с прогрессом
+  function uploadFile(inputElem, fileType) {
+    let file = inputElem.files[0];
+    if (!file) return;
+    
+    if (!currentChatRoom) {
+      console.warn("Не выбрана комната для отправки файла!");
+      alert("Пожалуйста, выберите чат перед отправкой файла.");
+      inputElem.value = "";
+      return;
+    }
+    
+    console.log(`Загрузка файла: ${file.name}, тип: ${fileType}, размер: ${file.size} байт`);
+    
+    let formData = new FormData();
+    formData.append('file', file);
+    formData.append('file_type', fileType);
+    formData.append('file_mode', 'compressed');
+
+    let xhr = new XMLHttpRequest();
+    xhr.open("POST", "/upload", true);
+    
+    // Отображение прогресса загрузки
+    xhr.upload.onprogress = function(e) {
+      if (e.lengthComputable) {
+        let percentComplete = Math.round((e.loaded / e.total) * 100);
+        let progressBar = document.getElementById("uploadProgress");
+        let progressContainer = document.getElementById("uploadProgressContainer");
+        progressContainer.style.display = "block";
+        progressBar.style.width = percentComplete + "%";
+        progressBar.innerText = percentComplete + "%";
+      }
+    };
+    
+    // Обработка ответа сервера
+    xhr.onload = function() {
+      document.getElementById("uploadProgressContainer").style.display = "none";
+      if (xhr.status === 200) {
+        try {
+          let data = JSON.parse(xhr.responseText);
+          console.log("Ответ сервера при загрузке файла:", data);
+          
+          if (data.file_url) {
+            // Вывод информации о сжатии
+            if (data.hasOwnProperty('original_size') && data.hasOwnProperty('compressed_size')) {
+              const originalKB = (data.original_size / 1024).toFixed(2);
+              const compressedKB = (data.compressed_size / 1024).toFixed(2);
+              const ratio = data.compression_ratio.toFixed(1);
+              const savedBytes = data.original_size - data.compressed_size;
+              const savedKB = (savedBytes / 1024).toFixed(2);
+              
+              console.log(`Исходный размер: ${originalKB} КБ`);
+              console.log(`Сжатый размер: ${compressedKB} КБ`);
+              console.log(`Степень сжатия: ${ratio}%`);
+              console.log(`Экономия: ${savedKB} КБ`);
+              
+              // Отображаем информацию о сжатии пользователю
+              let compressionInfoContainer = document.getElementById("compressionInfoContainer");
+              let compressionInfo = document.getElementById("compressionInfo");
+              
+              if (compressionInfoContainer && compressionInfo) {
+                if (data.compression_ratio > 0) {
+                  compressionInfo.innerHTML = `
+                    <strong>Файл сжат!</strong> 
+                    Оригинал: ${originalKB} КБ ➡️ Сжатый: ${compressedKB} КБ 
+                    <span class="badge bg-success">-${ratio}%</span> 
+                    Экономия: ${savedKB} КБ
+                  `;
+                  compressionInfoContainer.className = "alert alert-success mb-2";
+                } else {
+                  compressionInfo.innerHTML = `
+                    <strong>Файл не сжимается</strong> 
+                    Размер: ${originalKB} КБ
+                  `;
+                  compressionInfoContainer.className = "alert alert-secondary mb-2";
+                }
+                compressionInfoContainer.style.display = "block";
+                
+                // Скрываем сообщение через 5 секунд
+                setTimeout(() => {
+                  compressionInfoContainer.style.display = "none";
+                }, 5000);
+              }
+            }
+            
+            // Отправка сообщения с файлом через сокет
+            console.log(`Отправка файла в комнату ${currentChatRoom}: ${data.file_url}`);
+            socket.emit("send_file_message", {
+              room: currentChatRoom,
+              receiver: currentChatPartner,
+              file_type: fileType,
+              file_url: data.file_url
+            });
+          } else {
+            console.error("Ошибка загрузки файла:", data.error || "Отсутствует URL файла");
+            alert("Ошибка загрузки: " + (data.error || "Неизвестная ошибка"));
+          }
+        } catch (e) {
+          console.error("Ошибка при разборе ответа сервера:", e, xhr.responseText);
+          alert("Ошибка при обработке ответа сервера");
+        }
+      } else {
+        console.error("Ошибка HTTP при загрузке файла:", xhr.status, xhr.statusText);
+        alert("Ошибка загрузки файла: " + xhr.status + " " + xhr.statusText);
+      }
+      
+      // Сбросить input файла
+      inputElem.value = "";
+    };
+    
+    xhr.onerror = function() {
+      document.getElementById("uploadProgressContainer").style.display = "none";
+      console.error("Сетевая ошибка при загрузке файла");
+      alert("Сетевая ошибка при загрузке файла");
+      inputElem.value = "";
+    };
+    
+    xhr.send(formData);
+  }
+
+  // Голосовая запись через MediaRecorder API
+  function toggleRecording() {
+    if (!currentChatRoom) {
+      alert("Пожалуйста, выберите чат перед записью голосового сообщения.");
+      return;
+    }
+    
+    let recordBtn = document.getElementById("recordBtn");
+    let sendVoiceBtn = document.getElementById("sendVoiceBtn");
+    let recordStatus = document.getElementById("recordStatus");
+
+    if (typeof MediaRecorder === "undefined") {
+      alert("MediaRecorder не поддерживается вашим браузером.");
+      return;
+    }
+
+    if (recordBtn.innerText === "Начать запись") {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          mediaRecorder = new MediaRecorder(stream);
+          console.log("MediaRecorder создан:", mediaRecorder);
+          audioChunks = [];
+          mediaRecorder.ondataavailable = function(e) {
+            console.log("Получены данные:", e.data.size, "байт");
+            audioChunks.push(e.data);
+          };
+          mediaRecorder.onstop = function() {
+            recordStatus.innerText = "Запись остановлена";
+            sendVoiceBtn.style.display = "inline-block";
+            // Закрываем медиапотоки
+            stream.getTracks().forEach(track => track.stop());
+          };
+          mediaRecorder.start();
+          recordStatus.innerText = "Запись...";
+          recordBtn.innerText = "Остановить запись";
+          sendVoiceBtn.style.display = "none";
+        })
+        .catch(err => {
+          console.error("Ошибка getUserMedia:", err);
+          alert("Не удалось получить доступ к микрофону.");
+        });
+    } else {
+      if (mediaRecorder) {
+        mediaRecorder.stop();
+      }
+      recordBtn.innerText = "Начать запись";
+    }
+  }
+
+  // Отправка записанного голосового сообщения
+  function sendVoiceMessage() {
+    if (!audioChunks.length || !currentChatRoom) return;
+    
+    let blob = new Blob(audioChunks, { type: 'audio/webm' });
+    console.log(`Отправка голосового сообщения, размер: ${blob.size} байт`);
+    
+    let formData = new FormData();
+    formData.append('file', blob, 'voice_message.webm');
+    formData.append('file_type', 'voice');
+    formData.append('file_mode', 'compressed');
+
+    let xhr = new XMLHttpRequest();
+    xhr.open("POST", "/upload", true);
+    xhr.upload.onprogress = function(e) {
+      if (e.lengthComputable) {
+        let percentComplete = Math.round((e.loaded / e.total) * 100);
+        let progressBar = document.getElementById("uploadProgress");
+        let progressContainer = document.getElementById("uploadProgressContainer");
+        progressContainer.style.display = "block";
+        progressBar.style.width = percentComplete + "%";
+        progressBar.innerText = percentComplete + "%";
+      }
+    };
+    xhr.onload = function() {
+      document.getElementById("uploadProgressContainer").style.display = "none";
+      if (xhr.status === 200) {
+        try {
+          let data = JSON.parse(xhr.responseText);
+          console.log("Ответ сервера при загрузке голосового сообщения:", data);
+          
+          if (data.file_url) {
+            // Вывод информации о сжатии
+            if (data.hasOwnProperty('original_size') && data.hasOwnProperty('compressed_size')) {
+              const originalKB = (data.original_size / 1024).toFixed(2);
+              const compressedKB = (data.compressed_size / 1024).toFixed(2);
+              const ratio = data.compression_ratio.toFixed(1);
+              
+              console.log(`Исходный размер голосового: ${originalKB} КБ`);
+              console.log(`Сжатый размер голосового: ${compressedKB} КБ`);
+              console.log(`Степень сжатия голосового: ${ratio}%`);
+              
+              // Отображаем информацию о сжатии
+              let compressionInfoContainer = document.getElementById("compressionInfoContainer");
+              let compressionInfo = document.getElementById("compressionInfo");
+              
+              if (compressionInfoContainer && compressionInfo) {
+                if (data.compression_ratio > 0) {
+                  compressionInfo.innerHTML = `
+                    <strong>Голосовое сообщение сжато!</strong> 
+                    Оригинал: ${originalKB} КБ ➡️ Сжатый: ${compressedKB} КБ 
+                    <span class="badge bg-success">-${ratio}%</span>
+                  `;
+                  compressionInfoContainer.className = "alert alert-success mb-2";
+                } else {
+                  compressionInfo.innerHTML = `
+                    <strong>Голосовое сообщение не сжимается</strong> 
+                    Размер: ${originalKB} КБ
+                  `;
+                  compressionInfoContainer.className = "alert alert-secondary mb-2";
+                }
+                compressionInfoContainer.style.display = "block";
+                
+                // Скрываем сообщение через 5 секунд
+                setTimeout(() => {
+                  compressionInfoContainer.style.display = "none";
+                }, 5000);
+              }
+            }
+            
+            socket.emit("send_file_message", {
+              room: currentChatRoom,
+              receiver: currentChatPartner,
+              file_type: "voice",
+              file_url: data.file_url
+            });
+          } else {
+            alert("Ошибка загрузки голосового сообщения: " + (data.error || "Неизвестная ошибка"));
+          }
+        } catch (e) {
+          console.error("Ошибка при разборе ответа сервера:", e);
+          alert("Ошибка при обработке ответа сервера");
+        }
+      } else {
+        console.error("Ошибка HTTP при загрузке голосового сообщения:", xhr.status, xhr.statusText);
+        alert("Ошибка загрузки голосового сообщения: " + xhr.status + " " + xhr.statusText);
+      }
+      
+      audioChunks = [];
+      document.getElementById("sendVoiceBtn").style.display = "none";
+      document.getElementById("recordStatus").innerText = "";
+    };
+    xhr.onerror = function() {
+      document.getElementById("uploadProgressContainer").style.display = "none";
+      console.error("Сетевая ошибка при загрузке голосового сообщения");
+      alert("Сетевая ошибка при загрузке голосового сообщения");
+    };
+    xhr.send(formData);
+  }
+
+  // Обработка событий набора текста
+  let typingTimeout = null;
+  document.getElementById("messageInput").addEventListener("input", function() {
+    if (!currentChatRoom) return;
+    
+    socket.emit("typing", { room: currentChatRoom, user: currentUser });
+    
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      socket.emit("stop_typing", { room: currentChatRoom, user: currentUser });
+    }, 3000);
+  });
+
+  // Обработка событий о наборе текста другими пользователями
+  socket.on("someone_typing", function(data) {
+    // Можно добавить индикатор набора текста
+    console.log(`${data.user} печатает...`);
+  });
+
+  socket.on("someone_stopped_typing", function(data) {
+    console.log(`${data.user} перестал печатать`);
+  });
+
+  // Загрузка списка чатов при загрузке страницы
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("Страница загружена, инициализация чата...");
+    loadChatList();
+    
+    // Если QueryString содержит параметр debug=1, показываем отладочную кнопку
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('debug') === '1') {
+      document.getElementById("debugButton").style.display = "inline-block";
+    }
+    
+    // Проверяем, есть ли выбранный пользователь из поиска
+    const selectedChatUser = localStorage.getItem('selectedChatUser');
+    if (selectedChatUser) {
+      console.log(`Открываем чат с пользователем ${selectedChatUser} из поиска`);
+      // Находим этого пользователя в списке чатов или открываем новый чат
+      let userFound = false;
+      
+      // Проверяем список чатов
+      document.querySelectorAll('#chatList li').forEach(li => {
+        if (li.innerText === selectedChatUser) {
+          // Имитируем клик на чат
+          li.click();
+          userFound = true;
+        }
+      });
+      
+      // Если пользователя нет в списке, открываем новый чат
+      if (!userFound) {
+        openChat(selectedChatUser);
+      }
+      
+      // Очищаем выбранного пользователя из localStorage
+      localStorage.removeItem('selectedChatUser');
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% block title %}Графики сжатия - GreenTalk{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>Аналитика алгоритмов сжатия</h2>
+  <button id="resetChartDataBtn" class="btn btn-danger" onclick="confirmResetChartData()">
+    <i class="bi bi-trash"></i> Сбросить данные графиков
+  </button>
+</div>
+
+<div class="row">
+  <!-- График зависимости степени сжатия от объёма исходных данных -->
+  <div class="col-md-6">
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">График 1: Зависимость степени сжатия от объёма исходных данных</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="compressionRatioChart" width="400" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- График времени обработки алгоритмов сжатия -->
+  <div class="col-md-6">
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">График 2: Время обработки алгоритмов сжатия</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="processingTimeChart" width="400" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Таблица с данными для графиков -->
+<div class="card">
+  <div class="card-header bg-secondary text-white">
+    <h5 class="card-title mb-0">Детальные данные по алгоритмам сжатия</h5>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover" id="algorithm-table">
+        <thead>
+          <tr>
+            <th>Алгоритм</th>
+            <th>Тип данных</th>
+            <th>Размер данных (КБ)</th>
+            <th>Степень сжатия (%)</th>
+            <th>Время обработки (мс)</th>
+          </tr>
+        </thead>
+        <tbody id="algorithm-table-body">
+          <!-- Данные будут загружены через JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно для подтверждения сброса данных графиков -->
+<div class="modal fade" id="resetChartDataModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Подтверждение сброса данных</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Вы действительно хотите сбросить все данные графиков?</p>
+        <p class="text-danger">Внимание! Это действие удалит все добавленные вами данные и вернёт графики к начальному состоянию. Данное действие нельзя отменить.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-danger" onclick="resetChartData()">Сбросить данные</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Форма для добавления тестовых данных -->
+<div class="card mt-4">
+  <div class="card-header bg-info text-white">
+    <h5 class="card-title mb-0">Добавить тестовые данные</h5>
+  </div>
+  <div class="card-body">
+    <form id="testDataForm">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label for="algorithm" class="form-label">Алгоритм</label>
+            <select class="form-select" id="algorithm" required>
+              <option value="bwt+mtf+rle+huffman">BWT+MTF+RLE+Huffman</option>
+              <option value="mtf+rle+huffman">MTF+RLE+Huffman</option>
+              <option value="huffman">Huffman</option>
+              <option value="rle">RLE</option>
+              <option value="pil">PIL JPEG</option>
+              <option value="autoencoder">Нейросеть (Автоэнкодер)</option>
+              <option value="zlib">zlib</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label for="dataType" class="form-label">Тип данных</label>
+            <select class="form-select" id="dataType" required>
+              <option value="text">Текст</option>
+              <option value="image">Изображение</option>
+              <option value="audio">Аудио</option>
+              <option value="video">Видео</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label for="dataSize" class="form-label">Размер (КБ)</label>
+            <input type="number" class="form-control" id="dataSize" required min="1" max="10000">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label for="compressionRatio" class="form-label">Сжатие (%)</label>
+            <input type="number" class="form-control" id="compressionRatio" required min="0" max="100">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label for="processingTime" class="form-label">Время (мс)</label>
+            <input type="number" class="form-control" id="processingTime" required min="1" max="10000">
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Добавить данные</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Тестовые данные для графиков (используются только если API недоступен)
+  let testData = [];
+  
+  // Сохраняем исходные данные для возможности сброса
+  const originalTestData = [];
+
+  // Загрузка данных из API и localStorage
+  function loadData() {
+    // Сначала пробуем загрузить из API реальные данные
+    fetch('/api/compression_data')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Ошибка при загрузке данных');
+        }
+        return response.json();
+      })
+      .then(apiData => {
+        console.log('Загружены реальные данные из API:', apiData);
+        
+        if (apiData && apiData.data && apiData.data.length > 0) {
+          // Получаем данные из пользовательских добавлений
+          const savedData = localStorage.getItem('compression_test_data');
+          let userAddedData = [];
+          
+          if (savedData) {
+            try {
+              userAddedData = JSON.parse(savedData);
+              // Фильтруем, оставляя только те, которые были добавлены вручную через форму
+              userAddedData = userAddedData.filter(item => 
+                item.isUserAdded === true
+              );
+            } catch (e) {
+              console.error("Ошибка при загрузке пользовательских данных из localStorage:", e);
+              userAddedData = [];
+            }
+          }
+          
+          // Объединяем данные из API и пользовательские данные
+          testData = [...apiData.data, ...userAddedData];
+          
+          // Обновляем интерфейс
+          if (testData.length > 0) {
+            populateTable();
+            createCompressionRatioChart();
+            createProcessingTimeChart();
+          } else {
+            // Очищаем таблицу и графики, если данных нет
+            document.getElementById('algorithm-table-body').innerHTML = '';
+            if (window.compressionRatioChart && window.compressionRatioChart instanceof Chart) {
+              window.compressionRatioChart.destroy();
+            }
+            if (window.processingTimeChart && window.processingTimeChart instanceof Chart) {
+              window.processingTimeChart.destroy();
+            }
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Ошибка при загрузке данных из API:', error);
+        
+        // В случае ошибки используем данные из localStorage или тестовые данные
+        const savedData = localStorage.getItem('compression_test_data');
+        if (savedData) {
+          try {
+            testData = JSON.parse(savedData);
+          } catch (e) {
+            console.error("Ошибка при загрузке данных из localStorage:", e);
+            testData = [];
+          }
+        }
+        if (testData.length > 0) {
+          populateTable();
+          createCompressionRatioChart();
+          createProcessingTimeChart();
+        } else {
+          // Очищаем таблицу и графики, если данных нет
+          document.getElementById('algorithm-table-body').innerHTML = '';
+          if (window.compressionRatioChart && window.compressionRatioChart instanceof Chart) {
+            window.compressionRatioChart.destroy();
+          }
+          if (window.processingTimeChart && window.processingTimeChart instanceof Chart) {
+            window.processingTimeChart.destroy();
+          }
+        }
+      });
+  }
+
+  // Сохранение данных в localStorage
+  function saveData() {
+    localStorage.setItem('compression_test_data', JSON.stringify(testData));
+  }
+
+  // Заполнение таблицы данными
+  function populateTable() {
+    const tableBody = document.getElementById('algorithm-table-body');
+    tableBody.innerHTML = '';
+
+    testData.forEach(data => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${data.algorithm}</td>
+        <td>${data.dataType}</td>
+        <td>${data.dataSize}</td>
+        <td>${data.compressionRatio}</td>
+        <td>${data.processingTime}</td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }
+
+  // Создание графика зависимости степени сжатия от объёма исходных данных
+  function createCompressionRatioChart() {
+    const ctx = document.getElementById('compressionRatioChart').getContext('2d');
+    
+    // Группировка данных по алгоритмам
+    const algorithms = [...new Set(testData.map(item => item.algorithm))];
+    const datasets = algorithms.map(algorithm => {
+      // Фильтруем данные для текущего алгоритма
+      const filteredData = testData.filter(item => item.algorithm === algorithm);
+      
+      // Сортируем по размеру данных
+      filteredData.sort((a, b) => a.dataSize - b.dataSize);
+      
+      // Генерируем цвет для алгоритма (но делаем его постоянным для конкретного алгоритма)
+      const hashCode = s => s.split('').reduce((a, b) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+      }, 0);
+      
+      const hash = Math.abs(hashCode(algorithm));
+      const r = (hash % 255);
+      const g = ((hash * 37) % 255);
+      const b = ((hash * 89) % 255);
+      
+      return {
+        label: algorithm,
+        data: filteredData.map(item => ({
+          x: item.dataSize,
+          y: item.compressionRatio
+        })),
+        backgroundColor: `rgba(${r}, ${g}, ${b}, 0.2)`,
+        borderColor: `rgba(${r}, ${g}, ${b}, 1)`,
+        borderWidth: 2,
+        tension: 0.3
+      };
+    });
+
+    // Если уже есть график, уничтожаем его перед созданием нового
+    console.log("Тип window.compressionRatioChart:", typeof window.compressionRatioChart, window.compressionRatioChart);
+    if (window.compressionRatioChart && window.compressionRatioChart instanceof Chart) {
+      window.compressionRatioChart.destroy();
+    }
+
+    window.compressionRatioChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Зависимость степени сжатия от объёма исходных данных'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.parsed.y}% сжатия при ${context.parsed.x}KB`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            position: 'bottom',
+            title: {
+              display: true,
+              text: 'Размер данных (КБ)'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Степень сжатия (%)'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Создание графика времени обработки алгоритмов сжатия
+  function createProcessingTimeChart() {
+    const ctx = document.getElementById('processingTimeChart').getContext('2d');
+    
+    // Группировка данных по алгоритмам
+    const algorithms = [...new Set(testData.map(item => item.algorithm))];
+    const datasets = algorithms.map(algorithm => {
+      // Фильтруем данные для текущего алгоритма
+      const filteredData = testData.filter(item => item.algorithm === algorithm);
+      
+      // Сортируем по размеру данных
+      filteredData.sort((a, b) => a.dataSize - b.dataSize);
+      
+      // Генерируем цвет для алгоритма (но делаем его постоянным для конкретного алгоритма)
+      const hashCode = s => s.split('').reduce((a, b) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+      }, 0);
+      
+      const hash = Math.abs(hashCode(algorithm));
+      const r = (hash % 255);
+      const g = ((hash * 37) % 255);
+      const b = ((hash * 89) % 255);
+      
+      return {
+        label: algorithm,
+        data: filteredData.map(item => ({
+          x: item.dataSize,
+          y: item.processingTime
+        })),
+        backgroundColor: `rgba(${r}, ${g}, ${b}, 0.2)`,
+        borderColor: `rgba(${r}, ${g}, ${b}, 1)`,
+        borderWidth: 2,
+        tension: 0.3
+      };
+    });
+
+    // Если уже есть график, уничтожаем его перед созданием нового
+    console.log("Тип window.processingTimeChart:", typeof window.processingTimeChart, window.processingTimeChart);
+    if (window.processingTimeChart && window.processingTimeChart instanceof Chart) {
+      window.processingTimeChart.destroy();
+    }
+
+    window.processingTimeChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Время обработки алгоритмов сжатия'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.parsed.y}мс при ${context.parsed.x}KB`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            position: 'bottom',
+            title: {
+              display: true,
+              text: 'Размер данных (КБ)'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Время обработки (мс)'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Функция для показа модального окна подтверждения сброса данных
+  function confirmResetChartData() {
+    let resetChartDataModal = new bootstrap.Modal(document.getElementById('resetChartDataModal'));
+    resetChartDataModal.show();
+  }
+  
+  // Функция для выполнения сброса данных графиков
+  function resetChartData() {
+    // Полностью очищаем пользовательские данные
+    localStorage.removeItem('compression_test_data');
+
+    // Очищаем данные в базе через API
+    fetch('/api/reset_compression_data', { method: 'POST' })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Скрываем модальное окно
+          let modal = bootstrap.Modal.getInstance(document.getElementById('resetChartDataModal'));
+          modal.hide();
+          // Показываем сообщение об успехе
+          alert("Данные графиков успешно сброшены!");
+          // Перезагружаем страницу для применения изменений
+          location.reload();
+        } else {
+          alert("Ошибка при сбросе данных!");
+        }
+      });
+  }
+
+  // Обработка формы для добавления тестовых данных
+  document.getElementById('testDataForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    
+    const newData = {
+      algorithm: document.getElementById('algorithm').value,
+      dataType: document.getElementById('dataType').value,
+      dataSize: parseInt(document.getElementById('dataSize').value),
+      compressionRatio: parseInt(document.getElementById('compressionRatio').value),
+      processingTime: parseInt(document.getElementById('processingTime').value),
+      isUserAdded: true // Помечаем, что это данные, добавленные пользователем
+    };
+    
+    testData.push(newData);
+    saveData();
+    
+    // Обновляем графики без перезагрузки страницы
+    populateTable();
+    createCompressionRatioChart();
+    createProcessingTimeChart();
+    
+    // Очищаем форму
+    document.getElementById('dataSize').value = '';
+    document.getElementById('compressionRatio').value = '';
+    document.getElementById('processingTime').value = '';
+  });
+
+  // Инициализация страницы
+  document.addEventListener('DOMContentLoaded', function() {
+    loadData();
+  });
+</script>
+{% endblock %}

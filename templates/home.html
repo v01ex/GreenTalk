@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Главная - GreenTalk{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-md-12">
+    <h2>Система компрессии данных GreenTalk</h2>
+    <div class="alert alert-info">
+      <p>Добро пожаловать в GreenTalk — мессенджер с функцией сжатия данных!</p>
+      <p>В этом приложении вы можете отправлять текстовые сообщения, изображения, видео и голосовые сообщения, 
+         которые автоматически сжимаются для экономии трафика и места на диске.</p>
+    </div>
+    
+    <div class="card-deck">
+      <div class="row">
+        <div class="col-md-4 mb-4">
+          <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+              <h4 class="card-title mb-0">Чаты</h4>
+            </div>
+            <div class="card-body">
+              <p class="card-text">Общайтесь с другими пользователями через приватные чаты.</p>
+              <a href="{{ url_for('private_chats') }}" class="btn btn-primary">Перейти к чатам</a>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+          <div class="card h-100">
+            <div class="card-header bg-success text-white">
+              <h4 class="card-title mb-0">Статистика сжатия</h4>
+            </div>
+            <div class="card-body">
+              <p class="card-text">Просмотрите статистику по сжатым файлам и оценке эффективности алгоритмов.</p>
+              <a href="{{ url_for('compression_stats') }}" class="btn btn-success">Посмотреть статистику</a>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+          <div class="card h-100">
+            <div class="card-header bg-info text-white">
+              <h4 class="card-title mb-0">Графики сжатия</h4>
+            </div>
+            <div class="card-body">
+              <p class="card-text">Изучите графики зависимости степени сжатия от размера данных и времени обработки.</p>
+              <a href="{{ url_for('compression_charts') }}" class="btn btn-info">Посмотреть графики</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
